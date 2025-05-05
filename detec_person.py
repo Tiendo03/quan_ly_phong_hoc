@@ -33,7 +33,7 @@ person_width = 0.3  # Chiều rộng trung bình của một người (m)
 
 
 def calibrate_camera():
-    calibrationDir = r"/home/orangepi/images"
+    calibrationDir = r"C:\Users\Admin\OneDrive\Documents\A\NCKH-2024\images"
     imgPathList = glob.glob(os.path.join(calibrationDir, "*.*"))
     nRows, nCols = 9, 6
     termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -67,250 +67,168 @@ tb_off(73)
 tb_off(70)
 tb_off(72)
 tb_off(232)
-# ===== Thêm các biến kiểm soát chế độ =====
-mode = "initial"  # initial, found, searching
-interval = 10
+mode = "initial"
+interval = 15
 last_check_time = time.time()
-no_person_counter_1 = 0
-no_person_counter_2 = 0
-no_person_counter_3 = 0
-no_person_counter_4 = 0
-if cv2.waitKey(1) & 0xFF == ord("q"):
-        tb_off(73)
-        tb_off(70)
-        tb_off(72)
-        tb_off(232)
-        for name, pin in gpio_pins.items():
-            if os.path.exists(f"/sys/class/gpio/gpio{pin}"):
-                os.system(f"echo {pin} | sudo tee /sys/class/gpio/unexport")
-                time.sleep(0.01)
-                break
-else: 
-    while True:
-        person_detected = False
-        current_time = time.time()
-        if current_time - last_check_time < interval:
+zone_states = {
+    1: {"pin": 73, "counter": 0, "active": False},
+    2: {"pin": 70, "counter": 0, "active": False},
+    3: {"pin": 72, "counter": 0, "active": False},
+    4: {"pin": 232, "counter": 0, "active": False},
+}
+while True:
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        break
+    current_time = time.time()
+    if current_time - last_check_time < interval:
+        continue
+
+    last_check_time = current_time
+    print(f"[{time.strftime('%X')}] >>> Đang kiểm tra camera - Chế độ: {mode}")
+
+    cap = cv2.VideoCapture(0)
+    time.sleep(0.5)  # cho camera ổn định
+    ret, frame = cap.read()
+
+    if not ret:
+        print("Lỗi không đọc được frame")
+        cap.release()
+        continue
+
+    frame_resized = cv2.resize(frame, (640, 480))
+    results = model.track(
+        frame_resized, conf=0.1, persist=True, tracker="bytetrack.yaml"
+    )
+    tracked_positions = []
+    detected_zones = {1: False, 2: False, 3: False, 4: False}
+    for r in results:
+        boxes = r.boxes
+        if boxes is None:
             continue
-
-        last_check_time = current_time
-        print(f"[{time.strftime('%X')}] >>> Đang kiểm tra camera - Chế độ: {mode}")
-
-        cap = cv2.VideoCapture(0)
-        time.sleep(0.5)  # cho camera ổn định
-        ret, frame = cap.read()
-
-        if not ret:
-            print("Lỗi không đọc được frame")
-            cap.release()
-            continue
-
-        frame_resized = cv2.resize(frame, (640, 480))
-        results = model.track(
-            frame_resized, conf=0.1, persist=True, tracker="bytetrack.yaml"
-        )
-        tracked_positions = []
-
-        for r in results:
-            boxes = r.boxes
-            if boxes is None:
-                continue
-            for box in boxes:
-                cls = int(box.cls[0])
-                if model_class_names[cls] == "person":
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                    track_id = int(box.id[0]) if box.id is not None else -1
-                    box_width = x2 - x1
-                    if box_width > 50:
-                        print(">> Có người.")
-                        mode = "found"
-                        interval = 15
-                        display_duration = 5
-                        display = time.time()
-                        no_person_counter = 0
-                        distance_bf = (person_width * focal_length) / box_width
-                        correction_factor = (
-                            distance_bf + 1.2
-                            if distance_bf < 1.5
-                            else 0.6 if distance_bf > 2 else 0.8
+        for box in boxes:
+            cls = int(box.cls[0])
+            if model_class_names[cls] == "person":
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                box_width = x2 - x1
+                if box_width > 50:
+                    print(">> Có người.")
+                    mode = "found"
+                    display_duration = 5
+                    display = time.time()
+                    # no_person_counter = 0
+                    while time.time() - display < display_duration:
+                        ret, frame = cap.read()
+                        if not ret:
+                            print("Loi khong doc duoc frame")
+                            break
+                        results = model.track(
+                            frame, conf=0.1, persist=True, tracker="bytetrack.yaml"
                         )
-                        distance = (person_width * focal_length) / (
-                            box_width * correction_factor
-                        )
-                        x = (x1 + x2) / 2
-                        y = (y1 + y2) / 2
-                        h, w = frame.shape[:2]
-                        X_world = (x - frame.shape[1] / 2) * distance / focal_length
-                        Z = distance
-                        tracked_positions.append((X_world, Z, track_id, distance))
-                        while time.time() - display < display_duration:
-                            ret, frame = cap.read()
-                            if not ret:
-                                print("Loi khong doc duoc frame")
-                                break
-                            results = model.track(
-                                frame, conf=0.1, persist=True, tracker="bytetrack.yaml"
-                            )
-                            tracked_positions = []
+                        tracked_positions = []
 
-                            for r in results:
-                                boxes = r.boxes
-                                if boxes is None:
+                        for r in results:
+                            boxes = r.boxes
+                            if boxes is None:
+                                continue
+                            for box in boxes:
+                                cls = int(box.cls[0])
+                                if model_class_names[cls] != "person":
                                     continue
-                                for box in boxes:
-                                    cls = int(box.cls[0])
-                                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                                    track_id = int(box.id[0]) if box.id is not None else -1
-                                    box_width = x2 - x1
-                                    print(f"Box width: {box_width}")
-                                    distance_bf = (person_width * focal_length) / box_width
-                                    print(f"Before: {distance_bf}")
-                                    correction_factor = (
-                                        distance_bf + 1.2
-                                        if distance_bf < 1.5
-                                        else 0.6 if distance_bf > 2 else 0.8
-                                    )
-                                    distance = (person_width * focal_length) / (
-                                        box_width * correction_factor
-                                    )
-                                    print(f"After: {distance}")
-                                    x = (x1 + x2) / 2
-                                    y = (y1 + y2) / 2
-                                    h, w = frame.shape[:2]
-                                    X_world = (
-                                        (x - frame.shape[1] / 2) * distance / focal_length
-                                    )
-                                    Z = distance
-                                    tracked_positions.append(
-                                        (X_world, Z, track_id, distance)
-                                    )
-                                    # Vẽ bounding box + hiển thị ID và khoảng cách
-                                    cv2.rectangle(
-                                        frame,
-                                        (int(x1), int(y1)),
-                                        (int(x2), int(y2)),
-                                        (255, 0, 255),
-                                        2,
-                                    )
-                                    cv2.putText(
-                                        frame,
-                                        f"ID: {track_id}",
-                                        (int(x1), int(y1) - 10),
-                                        cv2.FONT_HERSHEY_SIMPLEX,
-                                        0.5,
-                                        (0, 255, 0),
-                                        2,
-                                    )
-                                    cv2.putText(
-                                        frame,
-                                        f"Distance: {distance:.2f}m",
-                                        (int(x1), int(y1) - 30),
-                                        cv2.FONT_HERSHEY_SIMPLEX,
-                                        0.5,
-                                        (0, 255, 0),
-                                        2,
-                                    )
-                                    if x < w / 2 and y < h / 2:
-                                        print("Nguoi o vung 1")
-                                        person_detected_v1 = True
-                                        tb_on(73)
-                                    else:
-                                        print("Khong co nguoi vung 1")
-                                        person_detected_v1 = False
-                                    if x >= w / 2 and y < h / 2:
-                                        print("Nguoi o vung 2")
-                                        person_detected_v2 = True
-                                        tb_on(70)
-                                    else:
-                                        print("Khong co nguoi vung 2")
-                                        person_detected_v2 = False
-                                    if x < w / 2 and y >= h / 2:
-                                        print("Nguoi o vung 3")
-                                        person_detected_v3 = True
-                                        tb_on(72)
-                                    else:
-                                        print("Khong co nguoi vung 3")
-                                        person_detected_v3 = False
-                                       
-                                    if x >= w / 2 and y >= h / 2:
-                                        print("Nguoi o vung 4")
-                                        person_detected_v4 = True
-                                        tb_on(232)
-                                    else:
-                                        print("Khong co nguoi vung 4")
-                                        person_detected_v4 = False
-                                        
-                            cv2.imshow("Frame", frame)
-                            if cv2.waitKey(1) & 0xFF == ord("q"):
-                                cap.release()
-                                cv2.destroyAllWindows()
-                                exit()
-                        # Vẽ và hiển thị
-                        cap.release()
-                        cv2.destroyAllWindows()
-                        last_check_time = time.time()
-                        break
-                        # Vùng
-            if person_detected_v1 == False:
-                if mode == "found":
-                    mode = "searching_1"
-                    interval = 10
-                    no_person_counter_1 = 1
-                elif mode == "searching_1":
-                    no_person_counter_1 += 1
-                    if no_person_counter_1 >= 3:
-                        print(">> Không có người trong 3 lần liên tiếp. Trở về chế độ ban đầu.")
-                        mode = "initial"
-                        interval = 15
-                        no_person_counter_1 = 0
-                        tb_off(73)
-                elif mode == "initial":
-                    interval = 15
-            if person_detected_v2 == False:
-                if mode == "found":
-                    mode = "searching_2"
-                    interval = 10
-                    no_person_counter_2 = 1
-                elif mode == "searching_2":
-                    no_person_counter_2 += 1
-                    if no_person_counter_2 >= 3:
-                        print(">> Không có người trong 3 lần liên tiếp. Trở về chế độ ban đầu.")
-                        mode = "initial"
-                        interval = 15
-                        no_person_counter_2 = 0
-                        tb_off(70)
-                elif mode == "initial":
-                    interval = 15
-            if person_detected_v3 == False:
-                if mode == "found":
-                    mode = "searching_3"
-                    interval = 10
-                    no_person_counter_3 = 1
-                elif mode == "searching_3":
-                    no_person_counter_3 += 1
-                    if no_person_counter_3 >= 3:
-                        print(">> Không có người trong 3 lần liên tiếp. Trở về chế độ ban đầu.")
-                        mode = "initial"
-                        interval = 15
-                        no_person_counter_3 = 0
-                        tb_off(72)
-                elif mode == "initial":
-                    interval = 15
-            if person_detected_v4 == False:
-                if mode == "found":
-                    mode = "searching_4"
-                    interval = 10
-                    no_person_counter_4 = 1
-                elif mode == "searching_4":
-                    no_person_counter_4 += 1
-                    if no_person_counter_4 >= 3:
-                        print(">> Không có người trong 3 lần liên tiếp. Trở về chế độ ban đầu.")
-                        mode = "initial"
-                        interval = 15
-                        no_person_counter_4 = 0
-                        tb_off(232)
-                elif mode == "initial":
-                    interval = 15
-    # Cập nhật mode và interval sau khi xử lý
+                                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                                track_id = int(box.id[0]) if box.id is not None else -1
+                                box_width = x2 - x1
+                                print(f"Box width: {box_width}")
+                                distance_bf = (person_width * focal_length) / box_width
+                                print(f"Before: {distance_bf}")
+                                correction_factor = (
+                                    distance_bf + 1.2
+                                    if distance_bf < 1.5
+                                    else 0.6 if distance_bf > 2 else 0.8
+                                )
+                                distance = (person_width * focal_length) / (
+                                    box_width * correction_factor
+                                )
+                                print(f"After: {distance}")
+                                x = (x1 + x2) / 2
+                                y = (y1 + y2) / 2
+                                h, w = frame.shape[:2]
+                                tracked_positions.append((track_id, distance))
+                                cv2.rectangle(
+                                    frame,
+                                    (int(x1), int(y1)),
+                                    (int(x2), int(y2)),
+                                    (255, 0, 255),
+                                    2,
+                                )
+                                cv2.putText(
+                                    frame,
+                                    f"ID: {track_id}",
+                                    (int(x1), int(y1) - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.5,
+                                    (0, 255, 0),
+                                    2,
+                                )
+                                cv2.putText(
+                                    frame,
+                                    f"Distance: {distance:.2f}m",
+                                    (int(x1), int(y1) - 30),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.5,
+                                    (0, 255, 0),
+                                    2,
+                                )
+                                if x < w / 2 and y < h / 2:
+                                    print("Nguoi o vung 1")
+                                    detected_zones[1] = True
+                                    # tb_on(73)
+                                else:
+                                    print("Khong co nguoi vung 1")
+                                if x >= w / 2 and y < h / 2:
+                                    print("Nguoi o vung 2")
+                                    detected_zones[2] = True
+                                    # tb_on(70)
+                                else:
+                                    print("Khong co nguoi vung 2")
+                                if x < w / 2 and y >= h / 2:
+                                    print("Nguoi o vung 3")
+                                    detected_zones[3] = True
+                                    # tb_on(72)
+                                else:
+                                    print("Khong co nguoi vung 3")
+                                if x >= w / 2 and y >= h / 2:
+                                    print("Nguoi o vung 4")
+                                    detected_zones[4] = True
+                                    # tb_on(232)
+                                else:
+                                    print("Khong co nguoi vung 4")
+
+                        cv2.imshow("Frame", frame)
+                        if cv2.waitKey(1) & 0xFF == ord("q"):
+                            cap.release()
+                            cv2.destroyAllWindows()
+                            exit()
+                    # Vẽ và hiển thị
+                    cap.release()
+                    cv2.destroyAllWindows()
+                    last_check_time = time.time()
+                    break
+                    # Vùng
+        for zone_id, state in zone_states.items():
+            if detected_zones[zone_id]:
+                state["counter"] = 0
+                if not state["active"]:
+                    tb_on(state["pin"])
+                    state["active"] = True
+                    print(f">> Bật vùng {zone_id}")
+            else:
+                state["counter"] += 1
+                print(f"Vùng {zone_id} không có người ({state['counter']}/3 lần)")
+                if state["counter"] >= 3:
+                    state["counter"] = 2
+                    tb_off(state["pin"])
+                    state["active"] = False
+                    print(f">> Tắt vùng {zone_id} sau 3 lần không phát hiện")
 
 cap.release()
 cv2.destroyAllWindows()
