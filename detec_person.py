@@ -121,8 +121,12 @@ while True:
                         if not ret:
                             print("Loi khong doc duoc frame")
                             break
+                        frame_resized = cv2.resize(frame, (480, 360))
                         results = model.track(
-                            frame, conf=0.1, persist=True, tracker="bytetrack.yaml"
+                            frame_resized,
+                            conf=0.1,
+                            persist=True,
+                            tracker="bytetrack.yaml",
                         )
                         tracked_positions = []
 
@@ -154,14 +158,14 @@ while True:
                                 h, w = frame.shape[:2]
                                 tracked_positions.append((track_id, distance))
                                 cv2.rectangle(
-                                    frame,
+                                    frame_resized,
                                     (int(x1), int(y1)),
                                     (int(x2), int(y2)),
                                     (255, 0, 255),
                                     2,
                                 )
                                 cv2.putText(
-                                    frame,
+                                    frame_resized,
                                     f"ID: {track_id}",
                                     (int(x1), int(y1) - 10),
                                     cv2.FONT_HERSHEY_SIMPLEX,
@@ -170,7 +174,7 @@ while True:
                                     2,
                                 )
                                 cv2.putText(
-                                    frame,
+                                    frame_resized,
                                     f"Distance: {distance:.2f}m",
                                     (int(x1), int(y1) - 30),
                                     cv2.FONT_HERSHEY_SIMPLEX,
@@ -203,7 +207,7 @@ while True:
                                 else:
                                     print("Khong co nguoi vung 4")
 
-                        cv2.imshow("Frame", frame)
+                        cv2.imshow("Frame", frame_resized)
                         if cv2.waitKey(1) & 0xFF == ord("q"):
                             cap.release()
                             cv2.destroyAllWindows()
@@ -214,21 +218,21 @@ while True:
                     last_check_time = time.time()
                     break
                     # Vùng
-        for zone_id, state in zone_states.items():
-            if detected_zones[zone_id]:
-                state["counter"] = 0
-                if not state["active"]:
-                    tb_on(state["pin"])
-                    state["active"] = True
-                    print(f">> Bật vùng {zone_id}")
-            else:
-                state["counter"] += 1
-                print(f"Vùng {zone_id} không có người ({state['counter']}/3 lần)")
-                if state["counter"] >= 3:
-                    state["counter"] = 2
-                    tb_off(state["pin"])
-                    state["active"] = False
-                    print(f">> Tắt vùng {zone_id} sau 3 lần không phát hiện")
+    for zone_id, state in zone_states.items():
+        if detected_zones[zone_id]:
+            state["counter"] = 0
+            if not state["active"]:
+                tb_on(state["pin"])
+                state["active"] = True
+                print(f">> Bật vùng {zone_id}")
+        else:
+            state["counter"] += 1
+            print(f"Vùng {zone_id} không có người ({state['counter']}/3 lần)")
+            if state["counter"] >= 3:
+                state["counter"] = 2
+                tb_off(state["pin"])
+                state["active"] = False
+                print(f">> Tắt vùng {zone_id} sau 3 lần không phát hiện")
 
 cap.release()
 cv2.destroyAllWindows()
