@@ -91,7 +91,7 @@ tb_off(70)
 tb_off(72)
 tb_off(232)
 mode = "initial"
-interval = 15
+interval = 5
 last_check_time = time.time()
 zone_states = {
     1: {"pin": 73, "counter": 0, "active": False},
@@ -136,10 +136,11 @@ while True:
                 if box_width > 50:
                     print(">> Có người.")
                     mode = "found"
-                    display_duration = 5
+                    display_duration = 10
                     display = time.time()
                     # no_person_counter = 0
                     while time.time() - display < display_duration:
+                        dem_tb = 0
                         latest_data = {}
                         ret, frame = cap.read()
                         if not ret:
@@ -202,17 +203,19 @@ while True:
                                     (0, 255, 0),
                                     2,
                                 )
-                                if x < w / 2 and y < h / 2:
+                                if x < w / 2 and y < h / 2 and distance > 2:
                                     print("Nguoi o vung 1")
                                     detected_zones[1] = True
                                     zone = 1
+                                    dem_tb += 1
                                     # tb_on(73)
                                 else:
                                     print("Khong co nguoi vung 1")
-                                if x >= w / 2 and y < h / 2:
+                                if x >= w / 2 and y < h / 2 and distance > 2:
                                     print("Nguoi o vung 2")
                                     detected_zones[2] = True
                                     zone = 2
+                                    dem_tb += 1
                                     # tb_on(70)
                                 else:
                                     print("Khong co nguoi vung 2")
@@ -220,6 +223,7 @@ while True:
                                     print("Nguoi o vung 3")
                                     detected_zones[3] = True
                                     zone = 3
+                                    dem_tb += 1
                                     # tb_on(72)
                                 else:
                                     print("Khong co nguoi vung 3")
@@ -227,10 +231,13 @@ while True:
                                     print("Nguoi o vung 4")
                                     detected_zones[4] = True
                                     zone = 4
+                                    dem_tb += 1
                                     # tb_on(232)
                                 else:
                                     print("Khong co nguoi vung 4")
                                 latest_data[track_id] = {
+                                    "phong": "1305 - A1",
+                                    "so_thiet_bi": dem_tb,
                                     "id": track_id,
                                     "distance": round(distance, 2),
                                     "zone": zone,
