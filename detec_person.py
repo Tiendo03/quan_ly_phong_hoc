@@ -17,11 +17,11 @@ for name, pin in gpio_pins.items():
 
 
 def tb_on(pin):
-    os.system(f"echo 0 | sudo tee /sys/class/gpio/gpio{pin}/value")
+    os.system(f"echo 1 | sudo tee /sys/class/gpio/gpio{pin}/value")
 
 
 def tb_off(pin):
-    os.system(f"echo 1 | sudo tee /sys/class/gpio/gpio{pin}/value")
+    os.system(f"echo 0 | sudo tee /sys/class/gpio/gpio{pin}/value")
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -33,7 +33,7 @@ person_width = 0.3  # Chiều rộng trung bình của một người (m)
 
 
 def calibrate_camera():
-    calibrationDir = r"C:\Users\Admin\OneDrive\Documents\A\NCKH-2024\images"
+    calibrationDir = r"/home/orangepi/quan_ly_phong_hoc-main/images"
     imgPathList = glob.glob(os.path.join(calibrationDir, "*.*"))
     nRows, nCols = 9, 6
     termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -59,16 +59,16 @@ def calibrate_camera():
     )
     return camMatrix, distCoeff
 
-
-print(calibrate_camera()[0])
-focal_length = calibrate_camera()[0][0][0]
+cam_matrix, dit_coeff = calibrate_camera()
+print(cam_matrix)
+focal_length = cam_matrix[0][0]
 
 tb_off(73)
 tb_off(70)
 tb_off(72)
 tb_off(232)
 mode = "initial"
-interval = 15
+interval = 10
 last_check_time = time.time()
 zone_states = {
     1: {"pin": 73, "counter": 0, "active": False},
@@ -99,7 +99,7 @@ while True:
     results = model.track(
         frame_resized, conf=0.1, persist=True, tracker="bytetrack.yaml"
     )
-    tracked_positions = []
+    # tracked_positions = []
     detected_zones = {1: False, 2: False, 3: False, 4: False}
     for r in results:
         boxes = r.boxes
@@ -113,7 +113,7 @@ while True:
                 if box_width > 50:
                     print(">> Có người.")
                     mode = "found"
-                    display_duration = 5
+                    display_duration = 15
                     display = time.time()
                     # no_person_counter = 0
                     while time.time() - display < display_duration:
@@ -128,7 +128,7 @@ while True:
                             persist=True,
                             tracker="bytetrack.yaml",
                         )
-                        tracked_positions = []
+                        # tracked_positions = []
 
                         for r in results:
                             boxes = r.boxes
@@ -144,19 +144,19 @@ while True:
                                 print(f"Box width: {box_width}")
                                 distance_bf = (person_width * focal_length) / box_width
                                 print(f"Before: {distance_bf}")
-                                correction_factor = (
-                                    distance_bf + 1.2
-                                    if distance_bf < 1.5
-                                    else 0.6 if distance_bf > 2 else 0.8
-                                )
-                                distance = (person_width * focal_length) / (
-                                    box_width * correction_factor
-                                )
-                                print(f"After: {distance}")
+                                # correction_factor = (
+                                #     distance_bf + 1.2
+                                #     if distance_bf < 1.5
+                                #     else 0.6 if distance_bf > 2 else 0.8
+                                # )
+                                # distance = (person_width * focal_length) / (
+                                #     box_width * correction_factor
+                                # )
+                                # print(f"After: {distance}")
                                 x = (x1 + x2) / 2
                                 y = (y1 + y2) / 2
                                 h, w = frame.shape[:2]
-                                tracked_positions.append((track_id, distance))
+                                # tracked_positions.append((track_id, distance_bf))
                                 cv2.rectangle(
                                     frame_resized,
                                     (int(x1), int(y1)),
@@ -175,20 +175,20 @@ while True:
                                 )
                                 cv2.putText(
                                     frame_resized,
-                                    f"Distance: {distance:.2f}m",
+                                    f"Distance: {distance_bf:.2f}m",
                                     (int(x1), int(y1) - 30),
                                     cv2.FONT_HERSHEY_SIMPLEX,
                                     0.5,
                                     (0, 255, 0),
                                     2,
                                 )
-                                if x < w / 2 and y < h / 2:
+                                if x < w / 2 and y < h / 2 and distance_bf > 2:
                                     print("Nguoi o vung 1")
                                     detected_zones[1] = True
                                     # tb_on(73)
                                 else:
                                     print("Khong co nguoi vung 1")
-                                if x >= w / 2 and y < h / 2:
+                                if x >= w / 2 and y < h / 2 and distance_bf > 2:
                                     print("Nguoi o vung 2")
                                     detected_zones[2] = True
                                     # tb_on(70)
@@ -233,6 +233,9 @@ while True:
                 tb_off(state["pin"])
                 state["active"] = False
                 print(f">> Tắt vùng {zone_id} sau 3 lần không phát hiện")
-
+tb_off(73)
+tb_off(70)
+tb_off(72)
+tb_off(232)
 cap.release()
 cv2.destroyAllWindows()
