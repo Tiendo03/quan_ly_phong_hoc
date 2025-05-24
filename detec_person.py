@@ -29,11 +29,11 @@ print(f"Device: {device}")
 
 model = YOLO("yolov8n.pt").to(device)
 model_class_names = model.names
-person_width = 0.3  # Chiều rộng trung bình của một người (m)
+person_width = 0.43  # Chiều rộng trung bình của một người (m)
 
 
 def calibrate_camera():
-    calibrationDir = r"/home/orangepi/quan_ly_phong_hoc-main/images"
+    calibrationDir = r"C:\Users\Admin\OneDrive\Documents\A\NCKH-2024\images"
     imgPathList = glob.glob(os.path.join(calibrationDir, "*.*"))
     nRows, nCols = 9, 6
     termCriteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -58,6 +58,7 @@ def calibrate_camera():
         worldPtsList, imgPtsList, imgGray.shape[::-1], None, None
     )
     return camMatrix, distCoeff
+
 
 cam_matrix, dit_coeff = calibrate_camera()
 print(cam_matrix)
