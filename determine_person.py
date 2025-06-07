@@ -83,8 +83,9 @@ def calibrate_camera():
     return camMatrix, distCoeff
 
 
-print(calibrate_camera()[0])
-focal_length = calibrate_camera()[0][0][0]
+cam_matrix, dist_coeff = calibrate_camera()
+print(cam_matrix)
+focal_length = cam_matrix[0][0]
 
 tb_off(73)
 tb_off(70)
@@ -141,6 +142,7 @@ while True:
                     # no_person_counter = 0
                     while time.time() - display < display_duration:
                         dem_tb = 0
+                        zones_detected = set()
                         latest_data = {}
                         ret, frame = cap.read()
                         if not ret:
@@ -178,6 +180,7 @@ while True:
                                 y = (y1 + y2) / 2
                                 h, w = frame.shape[:2]
                                 tracked_positions.append((track_id, distance))
+                                zone = None
                                 cv2.rectangle(
                                     frame,
                                     (int(x1), int(y1)),
@@ -207,7 +210,7 @@ while True:
                                     print("Nguoi o vung 1")
                                     detected_zones[1] = True
                                     zone = 1
-                                    dem_tb += 1
+                                    zones_detected.add(zone)
                                     # tb_on(73)
                                 else:
                                     print("Khong co nguoi vung 1")
@@ -215,7 +218,7 @@ while True:
                                     print("Nguoi o vung 2")
                                     detected_zones[2] = True
                                     zone = 2
-                                    dem_tb += 1
+                                    zones_detected.add(zone)
                                     # tb_on(70)
                                 else:
                                     print("Khong co nguoi vung 2")
@@ -223,7 +226,7 @@ while True:
                                     print("Nguoi o vung 3")
                                     detected_zones[3] = True
                                     zone = 3
-                                    dem_tb += 1
+                                    zones_detected.add(zone)
                                     # tb_on(72)
                                 else:
                                     print("Khong co nguoi vung 3")
@@ -231,10 +234,11 @@ while True:
                                     print("Nguoi o vung 4")
                                     detected_zones[4] = True
                                     zone = 4
-                                    dem_tb += 1
+                                    zones_detected.add(zone)
                                     # tb_on(232)
                                 else:
                                     print("Khong co nguoi vung 4")
+                                dem_tb = len(zones_detected)
                                 latest_data[track_id] = {
                                     "phong": "1305 - A1",
                                     "so_thiet_bi": dem_tb,
