@@ -163,17 +163,17 @@ while True:
                                 track_id = int(box.id[0]) if box.id is not None else -1
                                 box_width = x2 - x1
                                 print(f"Box width: {box_width}")
-                                distance_bf = (person_width * focal_length) / box_width
-                                print(f"Before: {distance_bf}")
-                                correction_factor = (
-                                    distance_bf + 1.2
-                                    if distance_bf < 1.5
-                                    else 0.6 if distance_bf > 2 else 0.8
-                                )
-                                distance = (person_width * focal_length) / (
-                                    box_width * correction_factor
-                                )
-                                print(f"After: {distance}")
+                                distance = (person_width * focal_length) / box_width
+                                # print(f"Before: {distance_bf}")
+                                # correction_factor = (
+                                #     distance_bf + 1.2
+                                #     if distance_bf < 1.5
+                                #     else 0.6 if distance_bf > 2 else 0.8
+                                # )
+                                # distance = (person_width * focal_length) / (
+                                #     box_width * correction_factor
+                                # )
+                                # print(f"After: {distance}")
                                 x = (x1 + x2) / 2
                                 y = (y1 + y2) / 2
                                 h, w = frame.shape[:2]
@@ -219,7 +219,7 @@ while True:
                                     # tb_on(70)
                                 else:
                                     print("Khong co nguoi vung 2")
-                                if x < w / 2 and y >= h / 2:
+                                if x < w / 2 and y >= h / 2 and distance > 1:
                                     print("Nguoi o vung 3")
                                     detected_zones[3] = True
                                     zone = 3
@@ -227,7 +227,7 @@ while True:
                                     # tb_on(72)
                                 else:
                                     print("Khong co nguoi vung 3")
-                                if x >= w / 2 and y >= h / 2:
+                                if x >= w / 2 and y >= h / 2 and distance > 1:
                                     print("Nguoi o vung 4")
                                     detected_zones[4] = True
                                     zone = 4
